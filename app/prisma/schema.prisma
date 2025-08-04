@@ -1,0 +1,163 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     Int                @id @default(autoincrement())
+  name                   String
+  email                  String             @unique
+  passwordHash           String
+  phoneNumber            String?
+  role                   String // 'customer', 'broker', 'admin'
+  avatarUrl              String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  properties             Property[]         @relation("OwnerProperties")
+  favorites              Favorite[]         @relation("CustomerFavorites")
+  appointmentsAsCustomer Appointment[]      @relation("CustomerAppointments")
+  appointmentsAsBroker   Appointment[]      @relation("BrokerAppointments")
+  transactionsAsBuyer    Transaction[]      @relation("BuyerTransactions")
+  transactionsAsBroker   Transaction[]      @relation("BrokerTransactions")
+  messagesSent           Message[]          @relation("SenderMessages")
+  messagesReceived       Message[]          @relation("ReceiverMessages")
+  brokerMemberships      BrokerMembership[]
+  statistics             Statistic[]
+  reviewsGiven           Review[]           @relation("ReviewerReviews")
+  reviewsReceived        Review[]           @relation("TargetUserReviews")
+}
+
+model Property {
+  id            Int           @id @default(autoincrement())
+  title         String
+  description   String?
+  price         Decimal       @db.Decimal(20, 2)
+  address       String
+  area          Decimal?      @db.Decimal(10, 2)
+  images        String[]
+  category      Category?     @relation(fields: [categoryId], references: [id])
+  categoryId    Int?
+  owner         User          @relation("OwnerProperties", fields: [ownerId], references: [id])
+  ownerId       Int
+  status        String        @default("pending") // 'pending', 'approved', 'sold'
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  favorites     Favorite[]
+  appointments  Appointment[]
+  transactions  Transaction[]
+  reviews       Review[]
+  listingType   ListingType?  @relation(fields: [listingTypeId], references: [id])
+  listingTypeId Int?
+}
+
+model Category {
+  id         Int        @id @default(autoincrement())
+  name       String
+  properties Property[]
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  customer   User     @relation("CustomerFavorites", fields: [customerId], references: [id])
+  customerId Int
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId Int
+  createdAt  DateTime @default(now())
+}
+
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  customer        User     @relation("CustomerAppointments", fields: [customerId], references: [id])
+  customerId      Int
+  broker          User     @relation("BrokerAppointments", fields: [brokerId], references: [id])
+  brokerId        Int
+  property        Property @relation(fields: [propertyId], references: [id])
+  propertyId      Int
+  appointmentTime DateTime
+  note            String?
+  status          String   @default("scheduled") // 'scheduled', 'completed', 'canceled'
+  createdAt       DateTime @default(now())
+}
+
+model Transaction {
+  id         Int      @id @default(autoincrement())
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId Int
+  buyer      User     @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  buyerId    Int
+  broker     User     @relation("BrokerTransactions", fields: [brokerId], references: [id])
+  brokerId   Int
+  price      Decimal  @db.Decimal(20, 2)
+  commission Decimal  @db.Decimal(20, 2) // Hoa hồng web nhận được
+  status     String   @default("in_process") // 'in_process', 'completed', 'canceled'
+  createdAt  DateTime @default(now())
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  sender     User     @relation("SenderMessages", fields: [senderId], references: [id])
+  senderId   Int
+  receiver   User     @relation("ReceiverMessages", fields: [receiverId], references: [id])
+  receiverId Int
+  content    String
+  sentAt     DateTime @default(now())
+}
+
+model MembershipPackage {
+  id                Int                @id @default(autoincrement())
+  name              String
+  price             Decimal            @db.Decimal(20, 2)
+  durationDays      Int
+  description       String?
+  brokerMemberships BrokerMembership[]
+}
+
+model BrokerMembership {
+  id        Int               @id @default(autoincrement())
+  broker    User              @relation(fields: [brokerId], references: [id])
+  brokerId  Int
+  package   MembershipPackage @relation(fields: [packageId], references: [id])
+  packageId Int
+  startDate DateTime
+  endDate   DateTime
+}
+
+model Statistic {
+  id                Int      @id @default(autoincrement())
+  user              User     @relation(fields: [userId], references: [id])
+  userId            Int
+  totalProperties   Int      @default(0)
+  totalTransactions Int      @default(0)
+  totalIncome       Decimal  @default(0.0) @db.Decimal(20, 2)
+  createdAt         DateTime @default(now())
+}
+
+model Review {
+  id           Int       @id @default(autoincrement())
+  reviewer     User      @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+  reviewerId   Int
+  targetUser   User?     @relation("TargetUserReviews", fields: [targetUserId], references: [id])
+  targetUserId Int?
+  property     Property? @relation(fields: [propertyId], references: [id])
+  propertyId   Int?
+  rating       Int
+  comment      String?
+  createdAt    DateTime  @default(now())
+}
+
+model ListingType {
+  id         Int        @id @default(autoincrement())
+  name       String
+  properties Property[]
+}
